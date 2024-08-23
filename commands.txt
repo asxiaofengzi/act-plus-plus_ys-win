@@ -1,0 +1,507 @@
+
+conda activate mimic  # 激活名为mimic的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+python3 imitate_episodes.py \  # 运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_human \  # 指定任务名称为sim_transfer_cube_human
+--ckpt_dir /scr/tonyzhao/train_logs/vq_test \  # 指定检查点目录
+--policy_class ACT --kl_weight 10 --chunk_size 100 \  # 指定策略类为ACT，KL权重为10，块大小为100
+--hidden_dim 512 --batch_size 8 --dim_feedforward 3200 \  # 指定隐藏层维度为512，批量大小为8，前馈维度为3200
+--num_epochs 10000 --lr 1e-5 --seed 0 --vq  # 指定训练轮数为10000，学习率为1e-5，随机种子为0，并启用vq
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name all \  # 指定任务名称为all
+--ckpt_dir /scr/tonyzhao/train_logs/pretrain_all \  # 指定检查点目录
+--policy_class ACT --kl_weight 10 --chunk_size 50 \  # 指定策略类为ACT，KL权重为10，块大小为50
+--hidden_dim 512 --batch_size 24 --dim_feedforward 3200 --num_epochs 5000 --lr 1e-4 --seed 0  # 指定隐藏层维度为512，批量大小为24，前馈维度为3200，训练轮数为5000，学习率为1e-4，随机种子为0
+
+#### NOTE to reproduce this experiment, uncomment the sim data filtering in utils.py  # 注意：要重现此实验，请取消注释utils.py中的模拟数据过滤
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name all \  # 指定任务名称为all
+--ckpt_dir /scr/tonyzhao/train_logs/pretrain_all \  # 指定检查点目录
+--policy_class ACT --kl_weight 10 --chunk_size 50 \  # 指定策略类为ACT，KL权重为10，块大小为50
+--hidden_dim 512 --batch_size 24 --dim_feedforward 3200 --lr 1e-4 --seed 0 \  # 指定隐藏层维度为512，批量大小为24，前馈维度为3200，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 10000000000 --validate_every 2000 --save_every 5000  # 指定训练步数为1000000，每10000000000步评估一次，每2000步验证一次，每5000步保存一次
+
+# generate mirrored data  # 生成镜像数据
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+python3 record_sim_episodes.py --task_name sim_transfer_cube_scripted_mirror --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted_mirror --num_episodes 50  # 运行record_sim_episodes.py脚本，生成50个镜像数据集
+python3 postprocess_episodes.py --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted_mirror --num_episodes 50  # 运行postprocess_episodes.py脚本，后处理50个镜像数据集
+# the sim_transfer_cube_scripted_mirror will have 100 episodes  # sim_transfer_cube_scripted_mirror将有100个集数
+# I then copy the whole dir to sim_transfer_cube_scripted then removed all mirrored episodes  # 然后我将整个目录复制到sim_transfer_cube_scripted并删除所有镜像集数
+# this gives sim_transfer_cube_scripted_mirror (100 episodes) and sim_transfer_cube_scripted (50 episodes)  # 这将生成sim_transfer_cube_scripted_mirror（100个集数）和sim_transfer_cube_scripted（50个集数）
+
+# visualize the original data  # 可视化原始数据
+python3 visualize_episodes.py --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted_mirror --episode_idx 0  # 运行visualize_episodes.py脚本，可视化第0个集数的原始数据
+# visualize the artificially mirrored data  # 可视化人工镜像数据
+python3 visualize_episodes.py --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted_mirror --episode_idx 0 --ismirror  # 运行visualize_episodes.py脚本，可视化第0个集数的人工镜像数据
+
+# sanity check  # 健全性检查
+# replay the mirrored data action in the original env  # 在原始环境中重放镜像数据动作
+python3 replay_episodes.py  --dataset_path /scr/tonyzhao/datasets/sim_transfer_cube_scripted_mirror/mirror_episode_0.hdf5  # 运行replay_episodes.py脚本，重放第0个镜像集数的动作
+# replay the original data action in the original env  # 在原始环境中重放原始数据动作
+python3 replay_episodes.py  --dataset_path /scr/tonyzhao/datasets/sim_transfer_cube_scripted_mirror/episode_0.hdf5  # 运行replay_episodes.py脚本，重放第0个原始集数的动作
+
+# launch experiment on original data  # 在原始数据上启动实验
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted \  # 指定检查点目录
+--policy_class ACT --kl_weight 10 --chunk_size 50 \  # 指定策略类为ACT，KL权重为10，块大小为50
+--hidden_dim 512 --batch_size 12 --dim_feedforward 3200 --lr 1e-5 --seed 0 \  # 指定隐藏层维度为512，批量大小为12，前馈维度为3200，学习率为1e-5，随机种子为0
+--num_steps 100000 --eval_every 2000 --validate_every 2000 --save_every 2000 --no_encoder  # 指定训练步数为100000，每2000步评估一次，每2000步验证一次，每2000步保存一次，并禁用编码器
+
+# launch experiment on all data  # 在所有数据上启动实验
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted_mirror \  # 指定任务名称为sim_transfer_cube_scripted_mirror
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_mirror \  # 指定检查点目录
+--policy_class ACT --kl_weight 10 --chunk_size 50 \  # 指定策略类为ACT，KL权重为10，块大小为50
+--hidden_dim 512 --batch_size 12 --dim_feedforward 3200 --lr 1e-5 --seed 0 \  # 指定隐藏层维度为512，批量大小为12，前馈维度为3200，学习率为1e-5，随机种子为0
+--num_steps 100000 --eval_every 2000 --validate_every 2000 --save_every 2000 --no_encoder  # 指定训练步数为100000，每2000步评估一次，每2000步验证一次，每2000步保存一次，并禁用编码器
+
+####### DIFFUSION POLICY  # 扩散策略
+
+- first install https://github.com/ARISE-Initiative/robomimic/tree/r2d2 (note the r2d2 branch)  # 首先安装https://github.com/ARISE-Initiative/robomimic/tree/r2d2（注意r2d2分支）
+- on top of it pip install the current repo requirements  # 然后安装当前仓库的依赖
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-5 --seed 0 \  # 指定批量大小为32，学习率为1e-5，随机种子为0
+--num_steps 100000 --eval_every 2000 --validate_every 2000 --save_every 2000  # 指定训练步数为100000，每2000步评估一次，每2000步验证一次，每2000步保存一次
+
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_1 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 16 \  # 指定策略类为Diffusion，块大小为16
+--batch_size 32 --lr 1e-5 --seed 0 \  # 指定批量大小为32，学习率为1e-5，随机种子为0
+--num_steps 100000 --eval_every 2000 --validate_every 2000 --save_every 2000  # 指定训练步数为100000，每2000步评估一次，每2000步验证一次，每2000步保存一次
+
+# above are all 100 train diffusion steps, 1e-5  # 上述是所有100次训练扩散步骤，学习率为1e-5
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_2_50step_1e-4 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 100000 --eval_every 2000 --validate_every 2000 --save_every 2000  # 指定训练步数为100000，每2000步评估一次，每2000步验证一次，每2000步保存一次
+
+# Dec 10  # 12月10日
+
+######################## more diffusion ########################  # 更多扩散实验
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_3_chunk64 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 64 \  # 指定策略类为Diffusion，块大小为64
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 200000 --eval_every 4000 --validate_every 4000 --save_every 4000  # 指定训练步数为200000，每4000步评估一次，每4000步验证一次，每4000步保存一次
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_4_regressionTest \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 200000 --eval_every 6000 --validate_every 6000 --save_every 6000  # 指定训练步数为200000，每6000步评估一次，每6000步验证一次，每6000步保存一次
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_5_noEMA \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 200000 --eval_every 6000 --validate_every 6000 --save_every 6000  # 指定训练步数为200000，每6000步评估一次，每6000步验证一次，每6000步保存一次
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name sim_transfer_cube_scripted \  # 指定任务名称为sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/cube_scripted_diffusion_sweep_6_noEMA_seed1 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 1 \  # 指定批量大小为32，学习率为1e-4，随机种子为1
+--num_steps 200000 --eval_every 6000 --validate_every 6000 --save_every 6000  # 指定训练步数为200000，每6000步评估一次，每6000步验证一次，每6000步保存一次
+
+###### Diffusion Real ######  # 扩散真实数据
+
+## deploy  # 部署
+python3 imitate_episodes.py --task_name aloha_mobile_wipe_wine --ckpt_dir /home/mobile-aloha/interbotix_ws/src/act/ckpts/wipe_wine_diffusion_augmentation_seed0/ --policy_class Diffusion --chunk_size 32 --batch_size 32 --lr 1e-4 --seed 0 --num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000 --eval  # 运行imitate_episodes.py脚本，指定任务名称为aloha_mobile_wipe_wine，检查点目录为/home/mobile-aloha/interbotix_ws/src/act/ckpts/wipe_wine_diffusion_augmentation_seed0/，策略类为Diffusion，块大小为32，批量大小为32，学习率为1e-4，随机种子为0，训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次，并进行评估
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine \  # 指定任务名称为aloha_mobile_wipe_wine
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_diffusion_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+## Cotrain  # 协同训练
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine_cotrain \  # 指定任务名称为aloha_mobile_wipe_wine_cotrain
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_cotrain_diffusion_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+# train no cotrain again with augmentations  # 再次训练无协同训练并进行数据增强
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine \  # 指定任务名称为aloha_mobile_wipe_wine
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_diffusion_augmentation_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+## Cotrain with augmentations  # 协同训练并进行数据增强
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine_cotrain \  # 指定任务名称为aloha_mobile_wipe_wine_cotrain
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_cotrain_diffusion_augmentation_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 32 \  # 指定策略类为Diffusion，块大小为32
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+# try chunk size 64, no cotrain  # 尝试块大小为64，无协同训练
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine \  # 指定任务名称为aloha_mobile_wipe_wine
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_diffusion_augmentation_chunk64_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 64 \  # 指定策略类为Diffusion，块大小为64
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+# chunk 64 with cotrain  # 块大小为64，进行协同训练
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine_cotrain \  # 指定任务名称为aloha_mobile_wipe_wine_cotrain
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_cotrain_diffusion_augmentation_chunk64_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 64 \  # 指定策略类为Diffusion，块大小为64
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+# chunk 64 with cotrain + EMA  # 块大小为64，进行协同训练并使用EMA
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=0 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为0并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine_2_cotrain \  # 指定任务名称为aloha_mobile_wipe_wine_2_cotrain
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_cotrain_diffusion_augmentation_chunk64_ema_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 64 \  # 指定策略类为Diffusion，块大小为64
+--batch_size 32 --lr 1e-4 --seed 0 \  # 指定批量大小为32，学习率为1e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+# chunk 64 with cotrain + EMA + 3e-4  # 块大小为64，进行协同训练并使用EMA，学习率为3e-4
+
+conda activate mobile  # 激活名为mobile的conda环境
+export MUJOCO_GL=egl  # 设置MUJOCO_GL环境变量为egl，以便使用EGL进行渲染
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 imitate_episodes.py \  # 设置CUDA_VISIBLE_DEVICES为1并运行imitate_episodes.py脚本
+--task_name aloha_mobile_wipe_wine_2_cotrain \  # 指定任务名称为aloha_mobile_wipe_wine_2_cotrain
+--ckpt_dir /scr/tonyzhao/train_logs/wipe_wine_cotrain_diffusion_augmentation_chunk64_ema_3e-4_seed0 \  # 指定检查点目录
+--policy_class Diffusion --chunk_size 64 \  # 指定策略类为Diffusion，块大小为64
+--batch_size 32 --lr 3e-4 --seed 0 \  # 指定批量大小为32，学习率为3e-4，随机种子为0
+--num_steps 1000000 --eval_every 1000000 --validate_every 5000 --save_every 5000  # 指定训练步数为1000000，每1000000步评估一次，每5000步验证一次，每5000步保存一次
+
+######################## VINN ########################  # VINN相关命令
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=1 python3 train.py --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted --cam_name top --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，指定数据集目录为/scr/tonyzhao/datasets/sim_transfer_cube_scripted，相机名称为top，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=0 python3 train.py --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted --cam_name left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为0并运行train.py脚本，指定数据集目录为/scr/tonyzhao/datasets/sim_transfer_cube_scripted，相机名称为left_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=1 python3 train.py --dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted --cam_name right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，指定数据集目录为/scr/tonyzhao/datasets/sim_transfer_cube_scripted，相机名称为right_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=sim_transfer_cube_scripted  # 设置任务名称为sim_transfer_cube_scripted
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt  # 运行vinn_cache_feature.py脚本，指定检查点路径为/home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-sim_transfer_cube_scripted-DUMMY-seed-0.pt
+
+TASK_NAME=sim_transfer_cube_scripted  # 设置任务名称为sim_transfer_cube_scripted
+python3 vinn_select_k.py \  # 运行vinn_select_k.py脚本
+--dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted \  # 指定数据集目录
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-seed-0-test  # 指定检查点目录
+
+python3 vinn_eval.py \  # 运行vinn_eval.py脚本
+--dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted \  # 指定数据集目录
+--model_dir /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 指定模型目录
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-seed-0-test \  # 指定检查点目录
+--task_name $TASK_NAME  # 指定任务名称
+
+## TODO  # 待办事项
+make sure env is consistent  # 确保环境一致
+tune a bit more  # 进行一些微调
+
+
+######################## VINN Real ########################  # VINN真实数据相关命令
+
+### test backward compatibility  # 测试向后兼容性
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task sim_transfer_cube_scripted --cam_name top --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为sim_transfer_cube_scripted，相机名称为top，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task sim_transfer_cube_scripted --cam_name left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为sim_transfer_cube_scripted，相机名称为left_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task sim_transfer_cube_scripted --cam_name right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为sim_transfer_cube_scripted，相机名称为right_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=sim_transfer_cube_scripted  # 设置任务名称为sim_transfer_cube_scripted
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt  # 运行vinn_cache_feature.py脚本，指定检查点路径为/home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-sim_transfer_cube_scripted-DUMMY-seed-0.pt
+
+TASK_NAME=sim_transfer_cube_scripted  # 设置任务名称为sim_transfer_cube_scripted
+python3 vinn_select_k.py \  # 运行vinn_select_k.py脚本
+--dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted \  # 指定数据集目录为/scr/tonyzhao/datasets/sim_transfer_cube_scripted
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-seed-0-test  # 指定检查点目录为/scr/tonyzhao/train_logs/VINN-eval-seed-0-test
+
+python3 vinn_eval.py \  # 运行vinn_eval.py脚本
+--dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted \  # 指定数据集目录为/scr/tonyzhao/datasets/sim_transfer_cube_scripted
+--model_dir /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 指定模型目录为/home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-sim_transfer_cube_scripted-DUMMY-seed-0.pt
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-seed-0-test \  # 指定检查点目录为/scr/tonyzhao/train_logs/VINN-eval-seed-0-test
+--task_name $TASK_NAME  # 指定任务名称为$TASK_NAME
+
+### new data loader passed backward compatibility  # 新的数据加载器通过了向后兼容性测试
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine --cam_name cam_high --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine，相机名称为cam_high，随机种子为0（已注释）
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine --cam_name cam_left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine，相机名称为cam_left_wrist，随机种子为0（已注释）
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine，相机名称为cam_right_wrist，随机种子为0（已注释）
+
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine_cotrain --cam_name cam_high --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine_cotrain，相机名称为cam_high，随机种子为0（已注释）
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine_cotrain --cam_name cam_left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine_cotrain，相机名称为cam_left_wrist，随机种子为0（已注释）
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine_cotrain --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine_cotrain，相机名称为cam_right_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan --cam_name cam_high --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan，相机名称为cam_high，随机种子为0（已注释）
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan --cam_name cam_left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan，相机名称为cam_left_wrist，随机种子为0（已注释）
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan，相机名称为cam_right_wrist，随机种子为0（已注释）
+
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan_cotrain --cam_name cam_high --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan_cotrain，相机名称为cam_high，随机种子为0（已注释）
+#CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan_cotrain --cam_name cam_left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan_cotrain，相机名称为cam_left_wrist，随机种子为0（已注释）
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan_cotrain --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan_cotrain，相机名称为cam_right_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wipe_wine_cotrain --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wipe_wine_cotrain，相机名称为cam_right_wrist，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_elevator_truncated --cam_name cam_high --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_elevator_truncated，相机名称为cam_high，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_elevator_truncated --cam_name cam_left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_elevator_truncated，相机名称为cam_left_wrist，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_elevator_truncated --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_elevator_truncated，相机名称为cam_right_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_wash_pan_cotrain --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_wash_pan_cotrain，相机名称为cam_right_wrist，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_elevator_truncated_cotrain --cam_name cam_high --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_elevator_truncated_cotrain，相机名称为cam_high，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_elevator_truncated_cotrain --cam_name cam_left_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_elevator_truncated_cotrain，相机名称为cam_left_wrist，随机种子为0
+CUDA_VISIBLE_DEVICES=1 python3 train.py --task aloha_mobile_elevator_truncated_cotrain --cam_name cam_right_wrist --seed 0  # 设置CUDA_VISIBLE_DEVICES为1并运行train.py脚本，任务为aloha_mobile_elevator_truncated_cotrain，相机名称为cam_right_wrist，随机种子为0
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_wipe_wine  # 设置任务名称为aloha_mobile_wipe_wine
+DATA_NAME=aloha_mobile_wipe_wine  # 设置数据名称为aloha_mobile_wipe_wine
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径为/home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-aloha_mobile_wipe_wine-DUMMY-seed-0.pt
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录为/scr/tonyzhao/mobile_aloha_datasets/aloha_mobile_wipe_wine
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_wipe_wine_cotrain  # 设置任务名称为aloha_mobile_wipe_wine_cotrain
+DATA_NAME=aloha_mobile_wipe_wine  # 设置数据名称为aloha_mobile_wipe_wine
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径为/home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-aloha_mobile_wipe_wine_cotrain-DUMMY-seed-0.pt
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录为/scr/tonyzhao/mobile_aloha_datasets/aloha_mobile_wipe_wine
+
+
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_wash_pan  # 设置任务名称为aloha_mobile_wash_pan
+DATA_NAME=aloha_mobile_wash_pan  # 设置数据名称为aloha_mobile_wash_pan
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_wash_pan_cotrain  # 设置任务名称为aloha_mobile_wash_pan_cotrain
+DATA_NAME=aloha_mobile_wash_pan  # 设置数据名称为aloha_mobile_wash_pan
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_elevator_truncated  # 设置任务名称为aloha_mobile_elevator_truncated
+DATA_NAME=aloha_mobile_elevator_truncated  # 设置数据名称为aloha_mobile_elevator_truncated
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_elevator_truncated_cotrain  # 设置任务名称为aloha_mobile_elevator_truncated_cotrain
+DATA_NAME=aloha_mobile_elevator_truncated  # 设置数据名称为aloha_mobile_elevator_truncated
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+# push chair task  # 推椅子任务
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=0  # 设置CUDA_VISIBLE_DEVICES为0
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+python3 train.py --task aloha_mobile_chair_truncated --cam_name cam_high --seed 0  # 运行train.py脚本，任务为aloha_mobile_chair_truncated，相机名称为cam_high，随机种子为0
+python3 train.py --task aloha_mobile_chair_truncated --cam_name cam_left_wrist --seed 0  # 运行train.py脚本，任务为aloha_mobile_chair_truncated，相机名称为cam_left_wrist，随机种子为0
+python3 train.py --task aloha_mobile_chair_truncated --cam_name cam_right_wrist --seed 0  # 运行train.py脚本，任务为aloha_mobile_chair_truncated，相机名称为cam_right_wrist，随机种子为0
+
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_chair_truncated  # 设置任务名称为aloha_mobile_chair_truncated
+DATA_NAME=aloha_mobile_chair_truncated  # 设置数据名称为aloha_mobile_chair_truncated
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=1  # 设置CUDA_VISIBLE_DEVICES为1
+cd /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning  # 切换到BYOL PyTorch示例目录
+python3 train.py --task aloha_mobile_chair_truncated_cotrain --cam_name cam_high --seed 0  # 运行train.py脚本，任务为aloha_mobile_chair_truncated_cotrain，相机名称为cam_high，随机种子为0
+python3 train.py --task aloha_mobile_chair_truncated_cotrain --cam_name cam_left_wrist --seed 0  # 运行train.py脚本，任务为aloha_mobile_chair_truncated_cotrain，相机名称为cam_left_wrist，随机种子为0
+python3 train.py --task aloha_mobile_chair_truncated_cotrain --cam_name cam_right_wrist --seed 0  # 运行train.py脚本，任务为aloha_mobile_chair_truncated_cotrain，相机名称为cam_right_wrist，随机种子为0
+
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_chair_truncated_cotrain  # 设置任务名称为aloha_mobile_chair_truncated_cotrain
+DATA_NAME=aloha_mobile_chair_truncated  # 设置数据名称为aloha_mobile_chair_truncated
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+
+# cache feature again for wipe wine  # 再次缓存wipe wine任务的特征
+
+conda activate mobile  # 激活名为mobile的conda环境
+export CUDA_VISIBLE_DEVICES=0  # 设置CUDA_VISIBLE_DEVICES为0
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_wipe_wine  # 设置任务名称为aloha_mobile_wipe_wine
+DATA_NAME=aloha_mobile_wipe_wine  # 设置数据名称为aloha_mobile_wipe_wine
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+TASK_NAME=aloha_mobile_wipe_wine_cotrain  # 设置任务名称为aloha_mobile_wipe_wine_cotrain
+DATA_NAME=aloha_mobile_wipe_wine  # 设置数据名称为aloha_mobile_wipe_wine
+python3 vinn_cache_feature.py --ckpt_path /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 运行vinn_cache_feature.py脚本，指定检查点路径
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME}  # 指定数据集目录
+
+
+
+# run on real robot  # 在真实机器人上运行
+
+TASK_NAME=aloha_mobile_chair_truncated  # 设置任务名称为aloha_mobile_chair_truncated
+python3 vinn_select_k.py \  # 运行vinn_select_k.py脚本
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME} \  # 指定数据集目录
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-${TASK_NAME}-seed-0  # 指定检查点目录
+
+python3 vinn_eval.py \  # 运行vinn_eval.py脚本
+--dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted \  # 指定数据集目录
+--model_dir /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 指定模型目录
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-${TASK_NAME}-seed-0 \  # 指定检查点目录
+--task_name $TASK_NAME  # 指定任务名称
+
+
+
+TASK_NAME=aloha_mobile_chair_truncated  # 设置任务名称为aloha_mobile_chair_truncated
+python3 vinn_select_k.py \  # 运行vinn_select_k.py脚本
+--dataset_dir /scr/tonyzhao/mobile_aloha_datasets/${DATA_NAME} \  # 指定数据集目录
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-${TASK_NAME}-seed-0  # 指定检查点目录
+
+python3 vinn_eval.py \  # 运行vinn_eval.py脚本
+--dataset_dir /scr/tonyzhao/datasets/sim_transfer_cube_scripted \  # 指定数据集目录
+--model_dir /home/tonyzhao/Research/act-plus-plus/byol_pytorch/examples/lightning/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 指定模型目录
+--ckpt_dir /scr/tonyzhao/train_logs/VINN-eval-${TASK_NAME}-seed-0 \  # 指定检查点目录
+--task_name $TASK_NAME  # 指定任务名称
+
+
+
+# eval on real robot  # 在真实机器人上评估
+
+conda activate aloha  # 激活名为aloha的conda环境
+cd /home/mobile-aloha/interbotix_ws/src/act  # 切换到项目目录
+TASK_NAME=aloha_mobile_wipe_wine  # 设置任务名称为aloha_mobile_wipe_wine
+python3 vinn_cache_feature.py --ckpt_path /home/mobile-aloha/interbotix_ws/src/act/ckpts/vinn_ckpts/byol-${TASK_NAME}-DUMMY-seed-0.pt  # 运行vinn_cache_feature.py脚本，指定检查点路径
+
+
+TASK_NAME=aloha_mobile_wipe_wine  # 设置任务名称为aloha_mobile_wipe_wine
+python3 vinn_select_k.py \  # 运行vinn_select_k.py脚本
+--dataset_dir /home/mobile-aloha/data/${TASK_NAME} \  # 指定数据集目录
+--ckpt_dir /home/mobile-aloha/interbotix_ws/src/act/ckpts/vinn_ckpts/VINN-eval-seed-0-test  # 指定检查点目录
+
+
+TASK_NAME=aloha_mobile_wipe_wine  # 设置任务名称为aloha_mobile_wipe_wine
+python3 vinn_eval.py \  # 运行vinn_eval.py脚本
+--dataset_dir /home/mobile-aloha/data/${TASK_NAME} \  # 指定数据集目录
+--model_dir /home/mobile-aloha/interbotix_ws/src/act/ckpts/vinn_ckpts/byol-${TASK_NAME}-DUMMY-seed-0.pt \  # 指定模型目录
+--ckpt_dir /home/mobile-aloha/interbotix_ws/src/act/ckpts/vinn_ckpts/VINN-eval-seed-0-test \  # 指定检查点目录
+--task_name $TASK_NAME  # 指定任务名称
+
+
+---------------------------------------------------------------------------------------
+
+# 注意：块大小不能是任意数字，启动前请尝试
+# 待办事项：在测试时添加历史记录和指数移动平均
+
+conda activate mobile  # 激活名为mobile的conda环境
+cd /home/tonyzhao/Research/act-plus-plus  # 切换到项目目录
+CUDA_VISIBLE_DEVICES=1 python3 train_actuator_network.py  # 设置CUDA_VISIBLE_DEVICES为1并运行train_actuator_network.py脚本
+
+
+
